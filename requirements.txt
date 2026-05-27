@@ -1,0 +1,5 @@
+# Este projeto usa apenas a biblioteca padrao do Python.
+# O arquivo existe para o setup instalar dependencias pip futuras de forma padronizada.
+#
+# Ubuntu/Linux tambem precisa dos pacotes de sistema:
+#   sudo apt install python3-venv python3-tk

@@ -3,8 +3,9 @@ from __future__ import annotations
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
+from .settings import AppSettings
 from .storage import TaskStore
 from .task_model import (
     PRIORITIES,
@@ -21,7 +22,7 @@ from .task_model import (
 
 
 APP_TITLE = "Work Tasks"
-DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "tasks.json"
+LEGACY_DATA_FOLDER = Path(__file__).resolve().parent.parent / "data"
 COLUMN_LABELS = {
     "title": "Tarefa",
     "area": "Area/Projeto",
@@ -48,10 +49,12 @@ FILTER_BUTTON_WIDTH = 30
 
 
 class TodoApp(tk.Tk):
-    def __init__(self, store: TaskStore) -> None:
+    def __init__(self, settings: AppSettings) -> None:
         super().__init__()
-        self.store = store
-        self.tasks = self.store.load()
+        self.settings = settings
+        self.data_folder = self.settings.load_data_folder()
+        self.store: TaskStore | None = None
+        self.tasks: list[Task] = []
         self.selected_task_id: str | None = None
         self.sort_column = "status"
         self.sort_reverse = False
@@ -70,10 +73,16 @@ class TodoApp(tk.Tk):
         self.minsize(940, 600)
         self.configure(bg="#f5f7fb")
 
+        if self.data_folder:
+            self._load_data_folder(self.data_folder, save_setting=False)
+
         self._build_vars()
         self._build_style()
         self._build_layout()
         self._refresh_tree()
+
+        if self.store is None:
+            self.after(250, lambda: self._choose_data_folder(initial=True))
 
     def _build_vars(self) -> None:
         self.title_var = tk.StringVar()
@@ -81,6 +90,7 @@ class TodoApp(tk.Tk):
         self.due_date_var = tk.StringVar()
         self.priority_var = tk.StringVar(value="Media")
         self.search_var = tk.StringVar()
+        self.data_folder_var = tk.StringVar(value=self._data_folder_text())
 
         self.search_var.trace_add("write", lambda *_: self._refresh_tree())
 
@@ -169,19 +179,30 @@ class TodoApp(tk.Tk):
         list_panel = ttk.Frame(shell, style="Panel.TFrame", padding=18)
         list_panel.grid(row=1, column=1, sticky="nsew", pady=(20, 0))
         list_panel.columnconfigure(0, weight=1)
-        list_panel.rowconfigure(3, weight=1)
+        list_panel.rowconfigure(4, weight=1)
+
+        data_controls = ttk.Frame(list_panel, style="Panel.TFrame")
+        data_controls.grid(row=0, column=0, sticky="ew")
+        data_controls.columnconfigure(0, weight=1)
+
+        ttk.Label(data_controls, textvariable=self.data_folder_var, style="Panel.TLabel").grid(
+            row=0, column=0, sticky="w", padx=(0, 12)
+        )
+        ttk.Button(data_controls, text="Alterar pasta de dados", command=self._choose_data_folder).grid(
+            row=0, column=1, sticky="e"
+        )
 
         filters = ttk.Frame(list_panel, style="Panel.TFrame")
-        filters.grid(row=0, column=0, sticky="ew")
+        filters.grid(row=1, column=0, sticky="ew", pady=(12, 0))
         filters.columnconfigure(0, weight=1)
 
         ttk.Entry(filters, textvariable=self.search_var).grid(row=0, column=0, sticky="ew")
 
         self.summary_label = ttk.Label(list_panel, text="", style="Panel.TLabel")
-        self.summary_label.grid(row=1, column=0, sticky="w", pady=(14, 8))
+        self.summary_label.grid(row=2, column=0, sticky="w", pady=(14, 8))
 
         self.header_frame = ttk.Frame(list_panel, style="Panel.TFrame")
-        self.header_frame.grid(row=2, column=0, sticky="ew")
+        self.header_frame.grid(row=3, column=0, sticky="ew")
         self._build_table_header()
 
         self.tree = ttk.Treeview(list_panel, columns=COLUMNS, show="", selectmode="browse")
@@ -209,16 +230,69 @@ class TodoApp(tk.Tk):
             anchor=tk.CENTER,
             stretch=False,
         )
-        self.tree.grid(row=3, column=0, sticky="nsew")
+        self.tree.grid(row=4, column=0, sticky="nsew")
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self.tree.bind("<Double-1>", lambda _event: self._toggle_selected())
         self.tree.bind("<Configure>", self._sync_table_widths)
 
         scrollbar = ttk.Scrollbar(list_panel, orient=tk.VERTICAL, command=self.tree.yview)
-        scrollbar.grid(row=3, column=1, sticky="ns")
+        scrollbar.grid(row=4, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.after_idle(self._sync_table_widths)
         self._update_headings()
+
+    def _data_folder_text(self) -> str:
+        if not self.data_folder:
+            return "Pasta de dados: nenhuma selecionada"
+        return f"Pasta de dados: {self.data_folder}"
+
+    def _load_data_folder(self, folder: Path, save_setting: bool = True) -> bool:
+        store = TaskStore(self.settings.tasks_file(folder))
+        try:
+            tasks = store.load()
+        except (OSError, ValueError) as error:
+            messagebox.showerror(APP_TITLE, f"Nao foi possivel carregar a pasta selecionada.\n\n{error}")
+            return False
+
+        self.data_folder = Path(folder)
+        self.store = store
+        self.tasks = tasks
+        if save_setting:
+            self.data_folder = self.settings.save_data_folder(folder)
+            self.store = TaskStore(self.settings.tasks_file(self.data_folder))
+        return True
+
+    def _choose_data_folder(self, initial: bool = False, reset_form: bool = True) -> None:
+        initial_dir = self.data_folder or (LEGACY_DATA_FOLDER if LEGACY_DATA_FOLDER.exists() else Path.home())
+        selected_folder = filedialog.askdirectory(
+            parent=self,
+            title="Selecione a pasta de dados",
+            initialdir=str(initial_dir),
+            mustexist=True,
+        )
+
+        if not selected_folder:
+            if initial and self.store is None:
+                messagebox.showinfo(
+                    APP_TITLE,
+                    "Selecione uma pasta de dados para salvar e carregar suas tarefas.",
+                )
+            return
+
+        if not self._load_data_folder(Path(selected_folder)):
+            return
+
+        self.data_folder_var.set(self._data_folder_text())
+        if reset_form:
+            self._clear_form()
+        self._refresh_tree()
+
+    def _ensure_store(self) -> bool:
+        if self.store is not None:
+            return True
+
+        self._choose_data_folder(initial=True, reset_form=False)
+        return self.store is not None
 
     def _build_table_header(self) -> None:
         for index, column in enumerate(COLUMNS):
@@ -552,7 +626,14 @@ class TodoApp(tk.Tk):
         self.is_formatting_due_date = False
 
     def _save_task(self) -> None:
+        if not self._ensure_store():
+            return
+
         if not self._validate_form():
+            return
+
+        store = self.store
+        if store is None:
             return
 
         notes = self.notes_text.get("1.0", tk.END).strip()
@@ -570,7 +651,7 @@ class TodoApp(tk.Tk):
                 status=existing.status,
                 created_at=existing.created_at,
             )
-            self.tasks = self.store.update(self.tasks, task)
+            self.tasks = store.update(self.tasks, task)
         else:
             task = Task(
                 title=self.title_var.get().strip(),
@@ -579,7 +660,7 @@ class TodoApp(tk.Tk):
                 priority=self.priority_var.get(),
                 notes=notes,
             )
-            self.tasks = self.store.add(self.tasks, task)
+            self.tasks = store.add(self.tasks, task)
             self._clear_form()
             self._refresh_tree()
             return
@@ -601,18 +682,28 @@ class TodoApp(tk.Tk):
         self.tree.selection_remove(self.tree.selection())
 
     def _toggle_selected(self) -> None:
+        if not self._ensure_store():
+            return
+
         task = self._selected_task()
         if not task:
             messagebox.showinfo(APP_TITLE, "Selecione uma tarefa primeiro.")
             return
 
-        self.tasks = self.store.toggle_status(self.tasks, task.task_id)
+        store = self.store
+        if store is None:
+            return
+
+        self.tasks = store.toggle_status(self.tasks, task.task_id)
         self._refresh_tree()
         if task.task_id in self.tree.get_children():
             self.tree.selection_set(task.task_id)
             self.tree.focus(task.task_id)
 
     def _delete_selected(self) -> None:
+        if not self._ensure_store():
+            return
+
         task = self._selected_task()
         if not task:
             messagebox.showinfo(APP_TITLE, "Selecione uma tarefa primeiro.")
@@ -621,11 +712,15 @@ class TodoApp(tk.Tk):
         if not messagebox.askyesno(APP_TITLE, f"Excluir a tarefa '{task.title}'?"):
             return
 
-        self.tasks = self.store.delete(self.tasks, task.task_id)
+        store = self.store
+        if store is None:
+            return
+
+        self.tasks = store.delete(self.tasks, task.task_id)
         self._clear_form()
         self._refresh_tree()
 
 
 def main() -> None:
-    app = TodoApp(TaskStore(DATA_FILE))
+    app = TodoApp(AppSettings())
     app.mainloop()
