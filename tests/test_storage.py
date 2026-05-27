@@ -25,7 +25,12 @@ class TaskStoreTest(unittest.TestCase):
     def test_save_and_load_tasks(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = TaskStore(Path(directory) / "tasks.json")
-            task = Task(title="Preparar relatorio", area="Financeiro", priority="Alta")
+            task = Task(
+                title="Preparar relatorio",
+                area="Financeiro",
+                related_person="Mariana",
+                priority="Alta",
+            )
 
             store.save([task])
             loaded = store.load()
@@ -33,6 +38,7 @@ class TaskStoreTest(unittest.TestCase):
             self.assertEqual(len(loaded), 1)
             self.assertEqual(loaded[0].title, "Preparar relatorio")
             self.assertEqual(loaded[0].area, "Financeiro")
+            self.assertEqual(loaded[0].related_person, "Mariana")
             self.assertEqual(loaded[0].priority, "Alta")
 
     def test_toggle_status_persists_change(self) -> None:
@@ -60,6 +66,11 @@ class TaskStoreTest(unittest.TestCase):
         task = Task.from_dict({"title": "Revisar proposta", "status": "waiting"})
 
         self.assertEqual(task.status, STATUS_PENDING)
+
+    def test_missing_related_person_loads_as_empty_text(self) -> None:
+        task = Task.from_dict({"title": "Revisar proposta"})
+
+        self.assertEqual(task.related_person, "")
 
     def test_legacy_due_date_is_loaded_as_brazilian_format(self) -> None:
         task = Task.from_dict({"title": "Fechar folha", "due_date": "2026-05-30"})

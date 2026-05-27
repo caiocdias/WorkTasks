@@ -26,22 +26,25 @@ LEGACY_DATA_FOLDER = Path(__file__).resolve().parent.parent / "data"
 COLUMN_LABELS = {
     "title": "Tarefa",
     "area": "Area/Projeto",
+    "related_person": "Pessoa relacionada",
     "priority": "Prioridade",
     "due_date": "Vencimento",
     "status": "Status",
 }
 COLUMNS = tuple(COLUMN_LABELS)
 COLUMN_WIDTHS = {
-    "title": 280,
-    "area": 160,
-    "priority": 100,
+    "title": 260,
+    "area": 145,
+    "related_person": 170,
+    "priority": 95,
     "due_date": 110,
     "status": 130,
 }
 COLUMN_MIN_WIDTHS = {
-    "title": 220,
-    "area": 120,
-    "priority": 90,
+    "title": 190,
+    "area": 105,
+    "related_person": 145,
+    "priority": 85,
     "due_date": 100,
     "status": 120,
 }
@@ -69,8 +72,8 @@ class TodoApp(tk.Tk):
         self.is_formatting_due_date = False
 
         self.title(APP_TITLE)
-        self.geometry("1060x680")
-        self.minsize(940, 600)
+        self.geometry("1180x720")
+        self.minsize(1080, 640)
         self.configure(bg="#f5f7fb")
 
         if self.data_folder:
@@ -87,6 +90,7 @@ class TodoApp(tk.Tk):
     def _build_vars(self) -> None:
         self.title_var = tk.StringVar()
         self.area_var = tk.StringVar()
+        self.related_person_var = tk.StringVar()
         self.due_date_var = tk.StringVar()
         self.priority_var = tk.StringVar(value="Media")
         self.search_var = tk.StringVar()
@@ -139,41 +143,44 @@ class TodoApp(tk.Tk):
         ttk.Label(form, text="Area ou projeto", style="Panel.TLabel").grid(row=3, column=0, sticky="w")
         ttk.Entry(form, textvariable=self.area_var).grid(row=4, column=0, sticky="ew", pady=(4, 14))
 
-        ttk.Label(form, text="Vencimento (DD/MM/AAAA)", style="Panel.TLabel").grid(row=5, column=0, sticky="w")
+        ttk.Label(form, text="Pessoa relacionada", style="Panel.TLabel").grid(row=5, column=0, sticky="w")
+        ttk.Entry(form, textvariable=self.related_person_var).grid(row=6, column=0, sticky="ew", pady=(4, 14))
+
+        ttk.Label(form, text="Vencimento (DD/MM/AAAA)", style="Panel.TLabel").grid(row=7, column=0, sticky="w")
         self.due_date_entry = ttk.Entry(form, textvariable=self.due_date_var)
-        self.due_date_entry.grid(row=6, column=0, sticky="ew", pady=(4, 14))
+        self.due_date_entry.grid(row=8, column=0, sticky="ew", pady=(4, 14))
         self.due_date_entry.bind("<KeyRelease>", self._apply_due_date_mask)
 
-        ttk.Label(form, text="Prioridade", style="Panel.TLabel").grid(row=7, column=0, sticky="w")
+        ttk.Label(form, text="Prioridade", style="Panel.TLabel").grid(row=9, column=0, sticky="w")
         ttk.Combobox(
             form,
             textvariable=self.priority_var,
             values=PRIORITIES,
             state="readonly",
-        ).grid(row=8, column=0, sticky="ew", pady=(4, 14))
+        ).grid(row=10, column=0, sticky="ew", pady=(4, 14))
 
-        ttk.Label(form, text="Observacoes", style="Panel.TLabel").grid(row=9, column=0, sticky="w")
+        ttk.Label(form, text="Observacoes", style="Panel.TLabel").grid(row=11, column=0, sticky="w")
         self.notes_text = tk.Text(
             form,
-            height=8,
+            height=6,
             width=34,
             wrap=tk.WORD,
             relief=tk.SOLID,
             borderwidth=1,
             font=("Segoe UI", 10),
         )
-        self.notes_text.grid(row=10, column=0, sticky="nsew", pady=(4, 16))
+        self.notes_text.grid(row=12, column=0, sticky="nsew", pady=(4, 16))
 
         self.save_button = ttk.Button(form, text="Criar tarefa", style="Primary.TButton", command=self._save_task)
         self.save_button.grid(
-            row=11, column=0, sticky="ew", pady=(0, 8)
-        )
-        ttk.Button(form, text="Nova tarefa", command=self._clear_form).grid(row=12, column=0, sticky="ew", pady=(0, 8))
-        ttk.Button(form, text="Concluir / reabrir", command=self._toggle_selected).grid(
             row=13, column=0, sticky="ew", pady=(0, 8)
         )
+        ttk.Button(form, text="Nova tarefa", command=self._clear_form).grid(row=14, column=0, sticky="ew", pady=(0, 8))
+        ttk.Button(form, text="Concluir / reabrir", command=self._toggle_selected).grid(
+            row=15, column=0, sticky="ew", pady=(0, 8)
+        )
         ttk.Button(form, text="Excluir selecionada", command=self._delete_selected).grid(
-            row=14, column=0, sticky="ew"
+            row=16, column=0, sticky="ew"
         )
 
         list_panel = ttk.Frame(shell, style="Panel.TFrame", padding=18)
@@ -209,6 +216,12 @@ class TodoApp(tk.Tk):
         self.tree.column("#0", width=0, minwidth=0, stretch=False)
         self.tree.column("title", width=COLUMN_WIDTHS["title"], minwidth=COLUMN_MIN_WIDTHS["title"], stretch=False)
         self.tree.column("area", width=COLUMN_WIDTHS["area"], minwidth=COLUMN_MIN_WIDTHS["area"], stretch=False)
+        self.tree.column(
+            "related_person",
+            width=COLUMN_WIDTHS["related_person"],
+            minwidth=COLUMN_MIN_WIDTHS["related_person"],
+            stretch=False,
+        )
         self.tree.column(
             "priority",
             width=COLUMN_WIDTHS["priority"],
@@ -371,7 +384,9 @@ class TodoApp(tk.Tk):
             tasks = [
                 task
                 for task in tasks
-                if search in " ".join([task.title, task.area, task.notes, task_state(task)]).lower()
+                if search in " ".join(
+                    [task.title, task.area, task.related_person, task.notes, task_state(task)]
+                ).lower()
             ]
 
         tasks = [task for task in tasks if self._passes_column_filters(task)]
@@ -395,6 +410,8 @@ class TodoApp(tk.Tk):
             return task.title
         if column == "area":
             return task.area
+        if column == "related_person":
+            return task.related_person
         if column == "priority":
             return task.priority
         if column == "due_date":
@@ -417,6 +434,8 @@ class TodoApp(tk.Tk):
             return (task.title.lower(), STATE_SORT_RANK[state], self._due_date_sort_key(task.due_date))
         if self.sort_column == "area":
             return (task.area.lower(), STATE_SORT_RANK[state], self._due_date_sort_key(task.due_date))
+        if self.sort_column == "related_person":
+            return (task.related_person.lower(), STATE_SORT_RANK[state], self._due_date_sort_key(task.due_date))
         if self.sort_column == "priority":
             return (priority_rank[task.priority], STATE_SORT_RANK[state], self._due_date_sort_key(task.due_date))
         if self.sort_column == "due_date":
@@ -567,7 +586,14 @@ class TodoApp(tk.Tk):
                 "",
                 tk.END,
                 iid=task.task_id,
-                values=(task.title, task.area, task.priority, task.due_date, task_state(task)),
+                values=(
+                    task.title,
+                    task.area,
+                    task.related_person,
+                    task.priority,
+                    task.due_date,
+                    task_state(task),
+                ),
             )
 
         done_count = sum(1 for task in self.tasks if task_state(task) == STATE_DONE)
@@ -593,6 +619,7 @@ class TodoApp(tk.Tk):
 
         self.title_var.set(task.title)
         self.area_var.set(task.area)
+        self.related_person_var.set(task.related_person)
         self.due_date_var.set(task.due_date)
         self.priority_var.set(task.priority)
         self.notes_text.delete("1.0", tk.END)
@@ -645,6 +672,7 @@ class TodoApp(tk.Tk):
                 task_id=existing.task_id,
                 title=self.title_var.get().strip(),
                 area=self.area_var.get().strip(),
+                related_person=self.related_person_var.get().strip(),
                 due_date=due_date,
                 priority=self.priority_var.get(),
                 notes=notes,
@@ -656,6 +684,7 @@ class TodoApp(tk.Tk):
             task = Task(
                 title=self.title_var.get().strip(),
                 area=self.area_var.get().strip(),
+                related_person=self.related_person_var.get().strip(),
                 due_date=due_date,
                 priority=self.priority_var.get(),
                 notes=notes,
@@ -674,6 +703,7 @@ class TodoApp(tk.Tk):
         self.selected_task_id = None
         self.title_var.set("")
         self.area_var.set("")
+        self.related_person_var.set("")
         self.due_date_var.set("")
         self.priority_var.set("Media")
         self.notes_text.delete("1.0", tk.END)
