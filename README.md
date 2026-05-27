@@ -6,7 +6,7 @@ Aplicativo desktop simples para organizar tarefas de trabalho com persistencia e
 
 - Criar, editar, concluir, reabrir e excluir tarefas.
 - Prioridade, area/projeto, data de vencimento em `dd/mm/aaaa` e observacoes.
-- Busca por texto, filtro por status calculado e ordenacao clicando nos cabecalhos.
+- Busca por texto e ordenacao clicando nos cabecalhos.
 - Cabecalho de cada coluna com botao separado para ordenar e botao de funil para filtrar.
 - Filtros por coluna com texto e selecao de valores existentes.
 - Mascara automatica no campo de vencimento para `dd/mm/aaaa`.

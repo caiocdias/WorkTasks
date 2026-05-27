@@ -37,6 +37,14 @@ COLUMN_WIDTHS = {
     "due_date": 110,
     "status": 130,
 }
+COLUMN_MIN_WIDTHS = {
+    "title": 220,
+    "area": 120,
+    "priority": 90,
+    "due_date": 100,
+    "status": 120,
+}
+FILTER_BUTTON_WIDTH = 30
 
 
 class TodoApp(tk.Tk):
@@ -53,6 +61,8 @@ class TodoApp(tk.Tk):
         }
         self.sort_buttons: dict[str, ttk.Button] = {}
         self.filter_buttons: dict[str, ttk.Button] = {}
+        self.header_cells: dict[str, ttk.Frame] = {}
+        self.syncing_table_widths = False
         self.is_formatting_due_date = False
 
         self.title(APP_TITLE)
@@ -71,10 +81,8 @@ class TodoApp(tk.Tk):
         self.due_date_var = tk.StringVar()
         self.priority_var = tk.StringVar(value="Media")
         self.search_var = tk.StringVar()
-        self.status_filter_var = tk.StringVar(value="Todas")
 
         self.search_var.trace_add("write", lambda *_: self._refresh_tree())
-        self.status_filter_var.trace_add("write", lambda *_: self._refresh_tree())
 
     def _build_style(self) -> None:
         style = ttk.Style(self)
@@ -167,14 +175,7 @@ class TodoApp(tk.Tk):
         filters.grid(row=0, column=0, sticky="ew")
         filters.columnconfigure(0, weight=1)
 
-        ttk.Entry(filters, textvariable=self.search_var).grid(row=0, column=0, sticky="ew", padx=(0, 12))
-        ttk.Combobox(
-            filters,
-            textvariable=self.status_filter_var,
-            values=("Todas", *TASK_STATES),
-            state="readonly",
-            width=18,
-        ).grid(row=0, column=1, sticky="e")
+        ttk.Entry(filters, textvariable=self.search_var).grid(row=0, column=0, sticky="ew")
 
         self.summary_label = ttk.Label(list_panel, text="", style="Panel.TLabel")
         self.summary_label.grid(row=1, column=0, sticky="w", pady=(14, 8))
@@ -184,34 +185,58 @@ class TodoApp(tk.Tk):
         self._build_table_header()
 
         self.tree = ttk.Treeview(list_panel, columns=COLUMNS, show="", selectmode="browse")
-        self.tree.column("title", width=COLUMN_WIDTHS["title"], minwidth=220)
-        self.tree.column("area", width=COLUMN_WIDTHS["area"], minwidth=120)
-        self.tree.column("priority", width=COLUMN_WIDTHS["priority"], minwidth=90, anchor=tk.CENTER)
-        self.tree.column("due_date", width=COLUMN_WIDTHS["due_date"], minwidth=100, anchor=tk.CENTER)
-        self.tree.column("status", width=COLUMN_WIDTHS["status"], minwidth=120, anchor=tk.CENTER)
+        self.tree.column("#0", width=0, minwidth=0, stretch=False)
+        self.tree.column("title", width=COLUMN_WIDTHS["title"], minwidth=COLUMN_MIN_WIDTHS["title"], stretch=False)
+        self.tree.column("area", width=COLUMN_WIDTHS["area"], minwidth=COLUMN_MIN_WIDTHS["area"], stretch=False)
+        self.tree.column(
+            "priority",
+            width=COLUMN_WIDTHS["priority"],
+            minwidth=COLUMN_MIN_WIDTHS["priority"],
+            anchor=tk.CENTER,
+            stretch=False,
+        )
+        self.tree.column(
+            "due_date",
+            width=COLUMN_WIDTHS["due_date"],
+            minwidth=COLUMN_MIN_WIDTHS["due_date"],
+            anchor=tk.CENTER,
+            stretch=False,
+        )
+        self.tree.column(
+            "status",
+            width=COLUMN_WIDTHS["status"],
+            minwidth=COLUMN_MIN_WIDTHS["status"],
+            anchor=tk.CENTER,
+            stretch=False,
+        )
         self.tree.grid(row=3, column=0, sticky="nsew")
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
         self.tree.bind("<Double-1>", lambda _event: self._toggle_selected())
+        self.tree.bind("<Configure>", self._sync_table_widths)
 
         scrollbar = ttk.Scrollbar(list_panel, orient=tk.VERTICAL, command=self.tree.yview)
         scrollbar.grid(row=3, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=scrollbar.set)
+        self.after_idle(self._sync_table_widths)
         self._update_headings()
 
     def _build_table_header(self) -> None:
         for index, column in enumerate(COLUMNS):
-            self.header_frame.columnconfigure(index, weight=COLUMN_WIDTHS[column], minsize=COLUMN_WIDTHS[column])
+            self.header_frame.columnconfigure(index, weight=0, minsize=COLUMN_WIDTHS[column])
 
             cell = ttk.Frame(self.header_frame, style="Panel.TFrame")
             cell.grid(row=0, column=index, sticky="ew")
+            cell.configure(width=COLUMN_WIDTHS[column], height=31)
+            cell.grid_propagate(False)
             cell.columnconfigure(0, weight=1)
+            cell.rowconfigure(0, weight=1)
 
             sort_button = ttk.Button(
                 cell,
                 style="HeaderSort.TButton",
                 command=lambda selected_column=column: self._set_sort(selected_column),
             )
-            sort_button.grid(row=0, column=0, sticky="ew")
+            sort_button.grid(row=0, column=0, sticky="nsew", padx=(0, FILTER_BUTTON_WIDTH))
 
             filter_button = ttk.Button(
                 cell,
@@ -219,19 +244,55 @@ class TodoApp(tk.Tk):
                 width=3,
                 command=lambda selected_column=column: self._open_column_filter(selected_column),
             )
-            filter_button.grid(row=0, column=1, sticky="e")
+            filter_button.place(
+                relx=1.0,
+                x=-1,
+                y=1,
+                width=FILTER_BUTTON_WIDTH,
+                relheight=1.0,
+                height=-2,
+                anchor="ne",
+            )
 
+            self.header_cells[column] = cell
             self.sort_buttons[column] = sort_button
             self.filter_buttons[column] = filter_button
 
+    def _sync_table_widths(self, _event: tk.Event | None = None) -> None:
+        if self.syncing_table_widths:
+            return
+
+        available_width = max(self.tree.winfo_width() - 2, sum(COLUMN_MIN_WIDTHS.values()))
+        widths = self._calculate_column_widths(available_width)
+
+        self.syncing_table_widths = True
+        for index, column in enumerate(COLUMNS):
+            width = widths[column]
+            self.tree.column(column, width=width, stretch=False)
+            self.header_cells[column].configure(width=width)
+            self.header_frame.columnconfigure(index, minsize=width)
+        self.syncing_table_widths = False
+
+    def _calculate_column_widths(self, available_width: int) -> dict[str, int]:
+        available_width = max(available_width, sum(COLUMN_MIN_WIDTHS.values()))
+        extra_width = available_width - sum(COLUMN_MIN_WIDTHS.values())
+        total_weight = sum(COLUMN_WIDTHS.values())
+        widths: dict[str, int] = {}
+        assigned_width = 0
+
+        for column in COLUMNS[:-1]:
+            width = COLUMN_MIN_WIDTHS[column] + round(extra_width * COLUMN_WIDTHS[column] / total_weight)
+            widths[column] = width
+            assigned_width += width
+
+        last_column = COLUMNS[-1]
+        widths[last_column] = available_width - assigned_width
+        return widths
+
     def _visible_tasks(self) -> list[Task]:
         search = self.search_var.get().strip().lower()
-        status_filter = self.status_filter_var.get()
 
         tasks = self.tasks
-        if status_filter != "Todas":
-            tasks = [task for task in tasks if task_state(task) == status_filter]
-
         if search:
             tasks = [
                 task
@@ -519,7 +580,9 @@ class TodoApp(tk.Tk):
                 notes=notes,
             )
             self.tasks = self.store.add(self.tasks, task)
-            self.selected_task_id = task.task_id
+            self._clear_form()
+            self._refresh_tree()
+            return
 
         self._refresh_tree()
         if self.selected_task_id in self.tree.get_children():
