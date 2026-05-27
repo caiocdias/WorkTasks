@@ -29,6 +29,7 @@ class TaskStoreTest(unittest.TestCase):
                 title="Preparar relatorio",
                 area="Financeiro",
                 related_person="Mariana",
+                related_person_contact="(31) 99999-0000",
                 priority="Alta",
             )
 
@@ -39,6 +40,7 @@ class TaskStoreTest(unittest.TestCase):
             self.assertEqual(loaded[0].title, "Preparar relatorio")
             self.assertEqual(loaded[0].area, "Financeiro")
             self.assertEqual(loaded[0].related_person, "Mariana")
+            self.assertEqual(loaded[0].related_person_contact, "(31) 99999-0000")
             self.assertEqual(loaded[0].priority, "Alta")
 
     def test_toggle_status_persists_change(self) -> None:
@@ -71,6 +73,11 @@ class TaskStoreTest(unittest.TestCase):
         task = Task.from_dict({"title": "Revisar proposta"})
 
         self.assertEqual(task.related_person, "")
+
+    def test_missing_related_person_contact_loads_as_empty_text(self) -> None:
+        task = Task.from_dict({"title": "Revisar proposta"})
+
+        self.assertEqual(task.related_person_contact, "")
 
     def test_legacy_due_date_is_loaded_as_brazilian_format(self) -> None:
         task = Task.from_dict({"title": "Fechar folha", "due_date": "2026-05-30"})

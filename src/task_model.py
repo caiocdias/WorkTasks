@@ -100,6 +100,7 @@ class Task:
     created_at: str = field(default_factory=now_iso)
     updated_at: str = field(default_factory=now_iso)
     related_person: str = ""
+    related_person_contact: str = ""
 
     @property
     def is_done(self) -> bool:
@@ -115,6 +116,7 @@ class Task:
             "notes": self.notes,
             "area": self.area,
             "related_person": self.related_person,
+            "related_person_contact": self.related_person_contact,
             "due_date": self.due_date,
             "priority": self.priority,
             "status": self.status,
@@ -138,6 +140,7 @@ class Task:
             notes=str(raw.get("notes") or ""),
             area=str(raw.get("area") or ""),
             related_person=str(raw.get("related_person") or ""),
+            related_person_contact=str(raw.get("related_person_contact") or ""),
             due_date=normalize_due_date(str(raw.get("due_date") or "")),
             priority=priority,
             status=status,
