@@ -19,6 +19,7 @@ from .task_model import (
     parse_due_date,
     task_state,
 )
+from .xlsx_export import export_tasks_to_xlsx
 
 
 APP_TITLE = "Work Tasks"
@@ -49,6 +50,10 @@ COLUMN_MIN_WIDTHS = {
     "status": 120,
 }
 FILTER_BUTTON_WIDTH = 30
+FORM_PANE_INITIAL_WIDTH = 320
+FORM_PANE_MIN_WIDTH = 300
+LIST_PANE_MIN_WIDTH = 620
+FORM_MODE_LABEL_WRAP_LENGTH = 260
 
 
 class TodoApp(tk.Tk):
@@ -134,11 +139,29 @@ class TodoApp(tk.Tk):
             style="Muted.TLabel",
         ).grid(row=0, column=1, sticky="e", padx=(16, 0))
 
-        form = ttk.Frame(shell, style="Panel.TFrame", padding=18)
-        form.grid(row=1, column=0, sticky="ns", pady=(20, 0), padx=(0, 18))
-        form.columnconfigure(0, weight=1)
+        content_pane = tk.PanedWindow(
+            shell,
+            orient=tk.HORIZONTAL,
+            background="#d1d5db",
+            borderwidth=0,
+            opaqueresize=True,
+            sashcursor="sb_h_double_arrow",
+            sashrelief=tk.FLAT,
+            sashwidth=8,
+        )
+        content_pane.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(20, 0))
 
-        self.form_mode_label = ttk.Label(form, text="Nova tarefa", style="Panel.TLabel")
+        form = ttk.Frame(content_pane, style="Panel.TFrame", padding=18, width=FORM_PANE_INITIAL_WIDTH)
+        form.columnconfigure(0, weight=1)
+        content_pane.add(form, minsize=FORM_PANE_MIN_WIDTH, width=FORM_PANE_INITIAL_WIDTH)
+
+        self.form_mode_label = ttk.Label(
+            form,
+            text="Nova tarefa",
+            style="Panel.TLabel",
+            width=34,
+            wraplength=FORM_MODE_LABEL_WRAP_LENGTH,
+        )
         self.form_mode_label.grid(row=0, column=0, sticky="w", pady=(0, 12))
 
         ttk.Label(form, text="Tarefa", style="Panel.TLabel").grid(row=1, column=0, sticky="w")
@@ -195,10 +218,10 @@ class TodoApp(tk.Tk):
             row=19, column=0, sticky="ew"
         )
 
-        list_panel = ttk.Frame(shell, style="Panel.TFrame", padding=18)
-        list_panel.grid(row=1, column=1, sticky="nsew", pady=(20, 0))
+        list_panel = ttk.Frame(content_pane, style="Panel.TFrame", padding=18)
         list_panel.columnconfigure(0, weight=1)
         list_panel.rowconfigure(4, weight=1)
+        content_pane.add(list_panel, minsize=LIST_PANE_MIN_WIDTH)
 
         data_controls = ttk.Frame(list_panel, style="Panel.TFrame")
         data_controls.grid(row=0, column=0, sticky="ew")
@@ -209,6 +232,9 @@ class TodoApp(tk.Tk):
         )
         ttk.Button(data_controls, text="Alterar pasta de dados", command=self._choose_data_folder).grid(
             row=0, column=1, sticky="e"
+        )
+        ttk.Button(data_controls, text="Exportar XLSX", command=self._export_visible_tasks).grid(
+            row=0, column=2, sticky="e", padx=(8, 0)
         )
 
         filters = ttk.Frame(list_panel, style="Panel.TFrame")
@@ -594,6 +620,29 @@ class TodoApp(tk.Tk):
         self._update_headings()
         self._refresh_tree()
         window.destroy()
+
+    def _export_visible_tasks(self) -> None:
+        visible_tasks = self._visible_tasks()
+        initial_dir = self.data_folder or Path.home()
+        selected_file = filedialog.asksaveasfilename(
+            parent=self,
+            title="Exportar tabela para XLSX",
+            initialdir=str(initial_dir),
+            initialfile="tarefas.xlsx",
+            defaultextension=".xlsx",
+            filetypes=(("Planilha Excel", "*.xlsx"), ("Todos os arquivos", "*.*")),
+        )
+
+        if not selected_file:
+            return
+
+        try:
+            output_path = export_tasks_to_xlsx(visible_tasks, selected_file)
+        except OSError as error:
+            messagebox.showerror(APP_TITLE, f"Nao foi possivel exportar a tabela.\n\n{error}")
+            return
+
+        messagebox.showinfo(APP_TITLE, f"Tabela exportada com sucesso.\n\n{output_path}")
 
     def _refresh_tree(self) -> None:
         for item in self.tree.get_children():

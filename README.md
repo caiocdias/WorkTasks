@@ -9,6 +9,7 @@ Aplicativo desktop simples para organizar tarefas de trabalho com persistencia e
 - Busca por texto e ordenacao clicando nos cabecalhos.
 - Cabecalho de cada coluna com botao separado para ordenar e botao de funil para filtrar.
 - Filtros por coluna com texto e selecao de valores existentes.
+- Exportacao da tabela visivel para `.xlsx`, incluindo observacoes e contato da pessoa relacionada.
 - Mascara automatica no campo de vencimento para `dd/mm/aaaa`.
 - Status calculados: `Concluída`, `No prazo`, `Vence em 7 dias`, `Vence hoje` e `Em atraso`.
 - Pasta de dados configuravel pela interface.
@@ -101,4 +102,5 @@ Ubuntu/Linux:
 - `src/settings.py`: configuracao da pasta de dados escolhida.
 - `src/storage.py`: leitura e escrita atomica do JSON local.
 - `src/task_model.py`: modelo de dados da tarefa.
+- `src/xlsx_export.py`: exportacao da tabela para `.xlsx`.
 - `tests/test_storage.py`: testes da camada de persistencia.
