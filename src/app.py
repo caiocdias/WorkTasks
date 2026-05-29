@@ -70,6 +70,7 @@ class TodoApp(tk.Tk):
         self.header_cells: dict[str, ttk.Frame] = {}
         self.syncing_table_widths = False
         self.is_formatting_due_date = False
+        self.form_feedback_clear_after_id: str | None = None
 
         self.title(APP_TITLE)
         self.geometry("1180x720")
@@ -96,6 +97,7 @@ class TodoApp(tk.Tk):
         self.priority_var = tk.StringVar(value="Media")
         self.search_var = tk.StringVar()
         self.data_folder_var = tk.StringVar(value=self._data_folder_text())
+        self.form_feedback_var = tk.StringVar()
 
         self.search_var.trace_add("write", lambda *_: self._refresh_tree())
 
@@ -106,6 +108,7 @@ class TodoApp(tk.Tk):
         style.configure("Panel.TFrame", background="#ffffff", relief="flat")
         style.configure("TLabel", background="#f5f7fb", foreground="#1f2937", font=("Segoe UI", 10))
         style.configure("Panel.TLabel", background="#ffffff", foreground="#1f2937", font=("Segoe UI", 10))
+        style.configure("Success.Panel.TLabel", background="#ffffff", foreground="#047857", font=("Segoe UI Semibold", 9))
         style.configure("Header.TLabel", background="#f5f7fb", foreground="#111827", font=("Segoe UI Semibold", 20))
         style.configure("Muted.TLabel", background="#f5f7fb", foreground="#6b7280", font=("Segoe UI", 9))
         style.configure("TButton", font=("Segoe UI", 10), padding=(12, 8))
@@ -177,16 +180,19 @@ class TodoApp(tk.Tk):
         )
         self.notes_text.grid(row=14, column=0, sticky="nsew", pady=(4, 16))
 
+        ttk.Label(form, textvariable=self.form_feedback_var, style="Success.Panel.TLabel").grid(
+            row=15, column=0, sticky="w", pady=(0, 6)
+        )
         self.save_button = ttk.Button(form, text="Criar tarefa", style="Primary.TButton", command=self._save_task)
         self.save_button.grid(
-            row=15, column=0, sticky="ew", pady=(0, 8)
+            row=16, column=0, sticky="ew", pady=(0, 8)
         )
-        ttk.Button(form, text="Nova tarefa", command=self._clear_form).grid(row=16, column=0, sticky="ew", pady=(0, 8))
+        ttk.Button(form, text="Nova tarefa", command=self._clear_form).grid(row=17, column=0, sticky="ew", pady=(0, 8))
         ttk.Button(form, text="Concluir / reabrir", command=self._toggle_selected).grid(
-            row=17, column=0, sticky="ew", pady=(0, 8)
+            row=18, column=0, sticky="ew", pady=(0, 8)
         )
         ttk.Button(form, text="Excluir selecionada", command=self._delete_selected).grid(
-            row=18, column=0, sticky="ew"
+            row=19, column=0, sticky="ew"
         )
 
         list_panel = ttk.Frame(shell, style="Panel.TFrame", padding=18)
@@ -625,7 +631,11 @@ class TodoApp(tk.Tk):
         if not selection:
             return
 
-        self.selected_task_id = selection[0]
+        selected_task_id = selection[0]
+        if selected_task_id != self.selected_task_id:
+            self._clear_form_feedback()
+
+        self.selected_task_id = selected_task_id
         task = self._selected_task()
         if not task:
             return
@@ -706,7 +716,8 @@ class TodoApp(tk.Tk):
                 notes=notes,
             )
             self.tasks = store.add(self.tasks, task)
-            self._clear_form()
+            self._clear_form(clear_feedback=False)
+            self._show_save_success()
             self._refresh_tree()
             return
 
@@ -714,8 +725,28 @@ class TodoApp(tk.Tk):
         if self.selected_task_id in self.tree.get_children():
             self.tree.selection_set(self.selected_task_id)
             self.tree.focus(self.selected_task_id)
+        self._show_save_success()
 
-    def _clear_form(self) -> None:
+    def _show_save_success(self) -> None:
+        self.form_feedback_var.set("Tarefa salva com sucesso")
+        self._cancel_form_feedback_timer()
+        self.form_feedback_clear_after_id = self.after(3000, self._clear_form_feedback)
+
+    def _clear_form_feedback(self) -> None:
+        self.form_feedback_var.set("")
+        self._cancel_form_feedback_timer()
+
+    def _cancel_form_feedback_timer(self) -> None:
+        if not self.form_feedback_clear_after_id:
+            return
+
+        try:
+            self.after_cancel(self.form_feedback_clear_after_id)
+        except tk.TclError:
+            pass
+        self.form_feedback_clear_after_id = None
+
+    def _clear_form(self, clear_feedback: bool = True) -> None:
         self.selected_task_id = None
         self.title_var.set("")
         self.area_var.set("")
@@ -726,6 +757,8 @@ class TodoApp(tk.Tk):
         self.notes_text.delete("1.0", tk.END)
         self.form_mode_label.configure(text="Nova tarefa")
         self.save_button.configure(text="Criar tarefa")
+        if clear_feedback:
+            self._clear_form_feedback()
         self.tree.selection_remove(self.tree.selection())
 
     def _toggle_selected(self) -> None:
