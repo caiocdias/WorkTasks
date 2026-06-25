@@ -17,6 +17,8 @@ from src.task_model import (
     STATUS_PENDING,
     Task,
     format_due_date_input,
+    normalize_hours,
+    parse_hours,
     task_state,
 )
 
@@ -30,6 +32,7 @@ class TaskStoreTest(unittest.TestCase):
                 area="Financeiro",
                 related_person="Mariana",
                 related_person_contact="(31) 99999-0000",
+                hours="2,5",
                 priority="Alta",
             )
 
@@ -41,6 +44,7 @@ class TaskStoreTest(unittest.TestCase):
             self.assertEqual(loaded[0].area, "Financeiro")
             self.assertEqual(loaded[0].related_person, "Mariana")
             self.assertEqual(loaded[0].related_person_contact, "(31) 99999-0000")
+            self.assertEqual(loaded[0].hours, "2,5")
             self.assertEqual(loaded[0].priority, "Alta")
 
     def test_toggle_status_persists_change(self) -> None:
@@ -79,10 +83,23 @@ class TaskStoreTest(unittest.TestCase):
 
         self.assertEqual(task.related_person_contact, "")
 
+    def test_missing_hours_loads_as_empty_text(self) -> None:
+        task = Task.from_dict({"title": "Revisar proposta"})
+
+        self.assertEqual(task.hours, "")
+
     def test_legacy_due_date_is_loaded_as_brazilian_format(self) -> None:
         task = Task.from_dict({"title": "Fechar folha", "due_date": "2026-05-30"})
 
         self.assertEqual(task.due_date, "30/05/2026")
+
+    def test_hours_are_normalized_from_comma_or_dot(self) -> None:
+        self.assertEqual(normalize_hours("2"), "2")
+        self.assertEqual(normalize_hours("2.50"), "2,5")
+        self.assertEqual(normalize_hours("2,50"), "2,5")
+        self.assertIsNotNone(parse_hours("0,25"))
+        self.assertIsNone(parse_hours("-1"))
+        self.assertIsNone(parse_hours("duas"))
 
     def test_due_date_input_mask_keeps_only_date_digits(self) -> None:
         self.assertEqual(format_due_date_input("1"), "1")

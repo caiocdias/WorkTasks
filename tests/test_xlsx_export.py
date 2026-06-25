@@ -20,6 +20,7 @@ class XlsxExportTest(unittest.TestCase):
                 related_person="Mariana",
                 related_person_contact="(31) 99999-0000",
                 due_date="30/05/2026",
+                hours="2,5",
                 priority="Alta",
                 notes="Enviar previa por e-mail",
             )
@@ -36,8 +37,10 @@ class XlsxExportTest(unittest.TestCase):
         exported_text = [node.text for node in root.findall(".//sheet:t", namespace)]
 
         self.assertIn("Contato da pessoa relacionada", exported_text)
+        self.assertIn("Horas", exported_text)
         self.assertIn("Observacoes", exported_text)
         self.assertIn("(31) 99999-0000", exported_text)
+        self.assertIn("2,5", exported_text)
         self.assertIn("Enviar previa por e-mail", exported_text)
 
     def test_export_adds_xlsx_extension_when_missing(self) -> None:

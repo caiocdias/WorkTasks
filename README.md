@@ -6,10 +6,11 @@ Aplicativo desktop simples para organizar tarefas de trabalho com persistencia e
 
 - Criar, editar, concluir, reabrir e excluir tarefas.
 - Prioridade, area/projeto, pessoa relacionada, contato, data de vencimento em `dd/mm/aaaa` e observacoes.
+- Quantidade de horas por tarefa, com suporte a valores decimais.
 - Busca por texto e ordenacao clicando nos cabecalhos.
 - Cabecalho de cada coluna com botao separado para ordenar e botao de funil para filtrar.
 - Filtros por coluna com texto e selecao de valores existentes.
-- Exportacao da tabela visivel para `.xlsx`, incluindo observacoes e contato da pessoa relacionada.
+- Exportacao da tabela visivel para `.xlsx`, incluindo horas, observacoes e contato da pessoa relacionada.
 - Mascara automatica no campo de vencimento para `dd/mm/aaaa`.
 - Status calculados: `Concluída`, `No prazo`, `Vence em 7 dias`, `Vence hoje` e `Em atraso`.
 - Pasta de dados configuravel pela interface.
@@ -27,6 +28,8 @@ Setup inicial:
 ```powershell
 .\setup.bat
 ```
+
+Se o script nao encontrar o Python automaticamente, cole o caminho completo do `python.exe` quando solicitado.
 
 Depois, para abrir o app:
 

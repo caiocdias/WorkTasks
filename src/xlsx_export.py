@@ -15,6 +15,7 @@ EXPORT_HEADERS = (
     "Contato da pessoa relacionada",
     "Prioridade",
     "Vencimento",
+    "Horas",
     "Status",
     "Observacoes",
 )
@@ -49,6 +50,7 @@ def _task_to_row(task: Task) -> tuple[str, ...]:
         task.related_person_contact,
         task.priority,
         task.due_date,
+        task.hours,
         task_state(task),
         task.notes,
     )
@@ -58,7 +60,7 @@ def _worksheet_xml(rows: list[tuple[str, ...]]) -> str:
     row_xml = "\n".join(_row_xml(index, row) for index, row in enumerate(rows, start=1))
     columns_xml = "\n".join(
         f'<col min="{index}" max="{index}" width="{width}" customWidth="1"/>'
-        for index, width in enumerate((32, 22, 24, 30, 14, 14, 18, 42), start=1)
+        for index, width in enumerate((32, 22, 24, 30, 14, 14, 12, 18, 42), start=1)
     )
     dimension = f"A1:{_column_name(len(EXPORT_HEADERS))}{max(len(rows), 1)}"
 

@@ -15,8 +15,10 @@ from .task_model import (
     TASK_STATES,
     Task,
     format_due_date_input,
+    normalize_hours,
     normalize_due_date,
     parse_due_date,
+    parse_hours,
     task_state,
 )
 from .xlsx_export import export_tasks_to_xlsx
@@ -30,6 +32,7 @@ COLUMN_LABELS = {
     "related_person": "Pessoa relacionada",
     "priority": "Prioridade",
     "due_date": "Vencimento",
+    "hours": "Horas",
     "status": "Status",
 }
 COLUMNS = tuple(COLUMN_LABELS)
@@ -39,6 +42,7 @@ COLUMN_WIDTHS = {
     "related_person": 170,
     "priority": 95,
     "due_date": 110,
+    "hours": 80,
     "status": 130,
 }
 COLUMN_MIN_WIDTHS = {
@@ -47,6 +51,7 @@ COLUMN_MIN_WIDTHS = {
     "related_person": 145,
     "priority": 85,
     "due_date": 100,
+    "hours": 70,
     "status": 120,
 }
 FILTER_BUTTON_WIDTH = 30
@@ -99,6 +104,7 @@ class TodoApp(tk.Tk):
         self.related_person_var = tk.StringVar()
         self.related_person_contact_var = tk.StringVar()
         self.due_date_var = tk.StringVar()
+        self.hours_var = tk.StringVar()
         self.priority_var = tk.StringVar(value="Media")
         self.search_var = tk.StringVar()
         self.data_folder_var = tk.StringVar(value=self._data_folder_text())
@@ -183,39 +189,42 @@ class TodoApp(tk.Tk):
         self.due_date_entry.grid(row=10, column=0, sticky="ew", pady=(4, 14))
         self.due_date_entry.bind("<KeyRelease>", self._apply_due_date_mask)
 
-        ttk.Label(form, text="Prioridade", style="Panel.TLabel").grid(row=11, column=0, sticky="w")
+        ttk.Label(form, text="Horas", style="Panel.TLabel").grid(row=11, column=0, sticky="w")
+        ttk.Entry(form, textvariable=self.hours_var).grid(row=12, column=0, sticky="ew", pady=(4, 14))
+
+        ttk.Label(form, text="Prioridade", style="Panel.TLabel").grid(row=13, column=0, sticky="w")
         ttk.Combobox(
             form,
             textvariable=self.priority_var,
             values=PRIORITIES,
             state="readonly",
-        ).grid(row=12, column=0, sticky="ew", pady=(4, 14))
+        ).grid(row=14, column=0, sticky="ew", pady=(4, 14))
 
-        ttk.Label(form, text="Observacoes", style="Panel.TLabel").grid(row=13, column=0, sticky="w")
+        ttk.Label(form, text="Observacoes", style="Panel.TLabel").grid(row=15, column=0, sticky="w")
         self.notes_text = tk.Text(
             form,
-            height=5,
+            height=4,
             width=34,
             wrap=tk.WORD,
             relief=tk.SOLID,
             borderwidth=1,
             font=("Segoe UI", 10),
         )
-        self.notes_text.grid(row=14, column=0, sticky="nsew", pady=(4, 16))
+        self.notes_text.grid(row=16, column=0, sticky="nsew", pady=(4, 16))
 
         ttk.Label(form, textvariable=self.form_feedback_var, style="Success.Panel.TLabel").grid(
-            row=15, column=0, sticky="w", pady=(0, 6)
+            row=17, column=0, sticky="w", pady=(0, 6)
         )
         self.save_button = ttk.Button(form, text="Criar tarefa", style="Primary.TButton", command=self._save_task)
         self.save_button.grid(
-            row=16, column=0, sticky="ew", pady=(0, 8)
-        )
-        ttk.Button(form, text="Nova tarefa", command=self._clear_form).grid(row=17, column=0, sticky="ew", pady=(0, 8))
-        ttk.Button(form, text="Concluir / reabrir", command=self._toggle_selected).grid(
             row=18, column=0, sticky="ew", pady=(0, 8)
         )
+        ttk.Button(form, text="Nova tarefa", command=self._clear_form).grid(row=19, column=0, sticky="ew", pady=(0, 8))
+        ttk.Button(form, text="Concluir / reabrir", command=self._toggle_selected).grid(
+            row=20, column=0, sticky="ew", pady=(0, 8)
+        )
         ttk.Button(form, text="Excluir selecionada", command=self._delete_selected).grid(
-            row=19, column=0, sticky="ew"
+            row=21, column=0, sticky="ew"
         )
 
         list_panel = ttk.Frame(content_pane, style="Panel.TFrame", padding=18)
@@ -271,6 +280,13 @@ class TodoApp(tk.Tk):
             "due_date",
             width=COLUMN_WIDTHS["due_date"],
             minwidth=COLUMN_MIN_WIDTHS["due_date"],
+            anchor=tk.CENTER,
+            stretch=False,
+        )
+        self.tree.column(
+            "hours",
+            width=COLUMN_WIDTHS["hours"],
+            minwidth=COLUMN_MIN_WIDTHS["hours"],
             anchor=tk.CENTER,
             stretch=False,
         )
@@ -428,6 +444,7 @@ class TodoApp(tk.Tk):
                         task.area,
                         task.related_person,
                         task.related_person_contact,
+                        task.hours,
                         task.notes,
                         task_state(task),
                     ]
@@ -461,6 +478,8 @@ class TodoApp(tk.Tk):
             return task.priority
         if column == "due_date":
             return task.due_date
+        if column == "hours":
+            return task.hours
         if column == "status":
             return task_state(task)
         return ""
@@ -470,6 +489,12 @@ class TodoApp(tk.Tk):
         if parsed is None:
             return "9999-99-99"
         return parsed.strftime("%Y-%m-%d")
+
+    def _hours_sort_key(self, hours: str) -> tuple[int, object]:
+        parsed = parse_hours(hours)
+        if parsed is None:
+            return (1, "")
+        return (0, parsed)
 
     def _sort_key(self, task: Task) -> tuple[object, ...]:
         priority_rank = {"Urgente": 0, "Alta": 1, "Media": 2, "Baixa": 3}
@@ -485,6 +510,8 @@ class TodoApp(tk.Tk):
             return (priority_rank[task.priority], STATE_SORT_RANK[state], self._due_date_sort_key(task.due_date))
         if self.sort_column == "due_date":
             return (self._due_date_sort_key(task.due_date), STATE_SORT_RANK[state], priority_rank[task.priority])
+        if self.sort_column == "hours":
+            return (self._hours_sort_key(task.hours), STATE_SORT_RANK[state], self._due_date_sort_key(task.due_date))
 
         return (STATE_SORT_RANK[state], self._due_date_sort_key(task.due_date), priority_rank[task.priority])
 
@@ -590,6 +617,8 @@ class TodoApp(tk.Tk):
             return ordered_values + sorted(values - set(ordered_values))
         if column == "due_date":
             return sorted(values, key=self._due_date_sort_key)
+        if column == "hours":
+            return sorted(values, key=self._hours_sort_key)
         return sorted(values, key=str.lower)
 
     def _display_filter_value(self, value: str) -> str:
@@ -660,6 +689,7 @@ class TodoApp(tk.Tk):
                     task.related_person,
                     task.priority,
                     task.due_date,
+                    task.hours,
                     task_state(task),
                 ),
             )
@@ -694,6 +724,7 @@ class TodoApp(tk.Tk):
         self.related_person_var.set(task.related_person)
         self.related_person_contact_var.set(task.related_person_contact)
         self.due_date_var.set(task.due_date)
+        self.hours_var.set(task.hours)
         self.priority_var.set(task.priority)
         self.notes_text.delete("1.0", tk.END)
         self.notes_text.insert("1.0", task.notes)
@@ -712,6 +743,11 @@ class TodoApp(tk.Tk):
             except ValueError:
                 messagebox.showwarning(APP_TITLE, "Use a data no formato DD/MM/AAAA.")
                 return False
+
+        hours = self.hours_var.get().strip()
+        if hours and parse_hours(hours) is None:
+            messagebox.showwarning(APP_TITLE, "Informe uma quantidade de horas valida.")
+            return False
 
         return True
 
@@ -738,6 +774,7 @@ class TodoApp(tk.Tk):
 
         notes = self.notes_text.get("1.0", tk.END).strip()
         due_date = normalize_due_date(self.due_date_var.get())
+        hours = normalize_hours(self.hours_var.get())
         existing = self._selected_task()
 
         if existing:
@@ -748,6 +785,7 @@ class TodoApp(tk.Tk):
                 related_person=self.related_person_var.get().strip(),
                 related_person_contact=self.related_person_contact_var.get().strip(),
                 due_date=due_date,
+                hours=hours,
                 priority=self.priority_var.get(),
                 notes=notes,
                 status=existing.status,
@@ -761,6 +799,7 @@ class TodoApp(tk.Tk):
                 related_person=self.related_person_var.get().strip(),
                 related_person_contact=self.related_person_contact_var.get().strip(),
                 due_date=due_date,
+                hours=hours,
                 priority=self.priority_var.get(),
                 notes=notes,
             )
@@ -802,6 +841,7 @@ class TodoApp(tk.Tk):
         self.related_person_var.set("")
         self.related_person_contact_var.set("")
         self.due_date_var.set("")
+        self.hours_var.set("")
         self.priority_var.set("Media")
         self.notes_text.delete("1.0", tk.END)
         self.form_mode_label.configure(text="Nova tarefa")

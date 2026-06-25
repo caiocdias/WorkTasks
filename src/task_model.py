@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import uuid4
 
@@ -68,6 +69,30 @@ def parse_due_date(value: str) -> date | None:
         return None
 
 
+def parse_hours(value: object) -> Decimal | None:
+    text = str(value or "").strip().replace(",", ".")
+    if not text:
+        return None
+
+    try:
+        hours = Decimal(text)
+    except InvalidOperation:
+        return None
+
+    if not hours.is_finite() or hours < 0:
+        return None
+    return hours
+
+
+def normalize_hours(value: object) -> str:
+    hours = parse_hours(value)
+    if hours is None:
+        return ""
+
+    text = format(hours.normalize(), "f")
+    return text.replace(".", ",")
+
+
 def task_state(task: "Task", today: date | None = None) -> str:
     if task.is_done:
         return STATE_DONE
@@ -94,6 +119,7 @@ class Task:
     notes: str = ""
     area: str = ""
     due_date: str = ""
+    hours: str = ""
     priority: str = "Media"
     status: str = STATUS_PENDING
     task_id: str = field(default_factory=lambda: str(uuid4()))
@@ -118,6 +144,7 @@ class Task:
             "related_person": self.related_person,
             "related_person_contact": self.related_person_contact,
             "due_date": self.due_date,
+            "hours": self.hours,
             "priority": self.priority,
             "status": self.status,
             "created_at": self.created_at,
@@ -142,6 +169,7 @@ class Task:
             related_person=str(raw.get("related_person") or ""),
             related_person_contact=str(raw.get("related_person_contact") or ""),
             due_date=normalize_due_date(str(raw.get("due_date") or "")),
+            hours=normalize_hours(raw.get("hours") or ""),
             priority=priority,
             status=status,
             created_at=str(raw.get("created_at") or now_iso()),
