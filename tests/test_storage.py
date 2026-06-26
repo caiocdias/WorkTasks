@@ -30,6 +30,7 @@ class TaskStoreTest(unittest.TestCase):
             task = Task(
                 title="Preparar relatorio",
                 area="Financeiro",
+                group="Fechamento",
                 related_person="Mariana",
                 related_person_contact="(31) 99999-0000",
                 hours="2,5",
@@ -42,6 +43,7 @@ class TaskStoreTest(unittest.TestCase):
             self.assertEqual(len(loaded), 1)
             self.assertEqual(loaded[0].title, "Preparar relatorio")
             self.assertEqual(loaded[0].area, "Financeiro")
+            self.assertEqual(loaded[0].group, "Fechamento")
             self.assertEqual(loaded[0].related_person, "Mariana")
             self.assertEqual(loaded[0].related_person_contact, "(31) 99999-0000")
             self.assertEqual(loaded[0].hours, "2,5")
@@ -77,6 +79,11 @@ class TaskStoreTest(unittest.TestCase):
         task = Task.from_dict({"title": "Revisar proposta"})
 
         self.assertEqual(task.related_person, "")
+
+    def test_missing_group_loads_as_empty_text(self) -> None:
+        task = Task.from_dict({"title": "Revisar proposta"})
+
+        self.assertEqual(task.group, "")
 
     def test_missing_related_person_contact_loads_as_empty_text(self) -> None:
         task = Task.from_dict({"title": "Revisar proposta"})

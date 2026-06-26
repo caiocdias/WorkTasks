@@ -29,6 +29,7 @@ LEGACY_DATA_FOLDER = Path(__file__).resolve().parent.parent / "data"
 COLUMN_LABELS = {
     "title": "Tarefa",
     "area": "Area/Projeto",
+    "group": "Grupo",
     "related_person": "Pessoa relacionada",
     "priority": "Prioridade",
     "due_date": "Vencimento",
@@ -37,22 +38,24 @@ COLUMN_LABELS = {
 }
 COLUMNS = tuple(COLUMN_LABELS)
 COLUMN_WIDTHS = {
-    "title": 260,
-    "area": 145,
-    "related_person": 170,
-    "priority": 95,
-    "due_date": 110,
-    "hours": 80,
-    "status": 130,
+    "title": 230,
+    "area": 120,
+    "group": 105,
+    "related_person": 150,
+    "priority": 90,
+    "due_date": 105,
+    "hours": 75,
+    "status": 120,
 }
 COLUMN_MIN_WIDTHS = {
-    "title": 190,
-    "area": 105,
-    "related_person": 145,
-    "priority": 85,
-    "due_date": 100,
-    "hours": 70,
-    "status": 120,
+    "title": 150,
+    "area": 85,
+    "group": 80,
+    "related_person": 115,
+    "priority": 75,
+    "due_date": 90,
+    "hours": 60,
+    "status": 105,
 }
 FILTER_BUTTON_WIDTH = 30
 FORM_PANE_INITIAL_WIDTH = 320
@@ -101,6 +104,7 @@ class TodoApp(tk.Tk):
     def _build_vars(self) -> None:
         self.title_var = tk.StringVar()
         self.area_var = tk.StringVar()
+        self.group_var = tk.StringVar()
         self.related_person_var = tk.StringVar()
         self.related_person_contact_var = tk.StringVar()
         self.due_date_var = tk.StringVar()
@@ -157,9 +161,33 @@ class TodoApp(tk.Tk):
         )
         content_pane.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(20, 0))
 
-        form = ttk.Frame(content_pane, style="Panel.TFrame", padding=18, width=FORM_PANE_INITIAL_WIDTH)
+        form_shell = ttk.Frame(content_pane, style="Panel.TFrame", width=FORM_PANE_INITIAL_WIDTH)
+        form_shell.columnconfigure(0, weight=1)
+        form_shell.rowconfigure(0, weight=1)
+        content_pane.add(form_shell, minsize=FORM_PANE_MIN_WIDTH, width=FORM_PANE_INITIAL_WIDTH)
+
+        self.form_canvas = tk.Canvas(
+            form_shell,
+            background="#ffffff",
+            borderwidth=0,
+            highlightthickness=0,
+        )
+        self.form_canvas.grid(row=0, column=0, sticky="nsew")
+        form_scrollbar = ttk.Scrollbar(form_shell, orient=tk.VERTICAL, command=self.form_canvas.yview)
+        form_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.form_canvas.configure(yscrollcommand=form_scrollbar.set)
+
+        form = ttk.Frame(self.form_canvas, style="Panel.TFrame", padding=18)
         form.columnconfigure(0, weight=1)
-        content_pane.add(form, minsize=FORM_PANE_MIN_WIDTH, width=FORM_PANE_INITIAL_WIDTH)
+        form_window = self.form_canvas.create_window((0, 0), window=form, anchor="nw")
+        form.bind(
+            "<Configure>",
+            lambda _event: self.form_canvas.configure(scrollregion=self.form_canvas.bbox("all")),
+        )
+        self.form_canvas.bind(
+            "<Configure>",
+            lambda event: self.form_canvas.itemconfigure(form_window, width=event.width),
+        )
 
         self.form_mode_label = ttk.Label(
             form,
@@ -176,31 +204,34 @@ class TodoApp(tk.Tk):
         ttk.Label(form, text="Area ou projeto", style="Panel.TLabel").grid(row=3, column=0, sticky="w")
         ttk.Entry(form, textvariable=self.area_var).grid(row=4, column=0, sticky="ew", pady=(4, 14))
 
-        ttk.Label(form, text="Pessoa relacionada", style="Panel.TLabel").grid(row=5, column=0, sticky="w")
-        ttk.Entry(form, textvariable=self.related_person_var).grid(row=6, column=0, sticky="ew", pady=(4, 14))
+        ttk.Label(form, text="Grupo", style="Panel.TLabel").grid(row=5, column=0, sticky="w")
+        ttk.Entry(form, textvariable=self.group_var).grid(row=6, column=0, sticky="ew", pady=(4, 14))
 
-        ttk.Label(form, text="Contato da pessoa relacionada", style="Panel.TLabel").grid(row=7, column=0, sticky="w")
+        ttk.Label(form, text="Pessoa relacionada", style="Panel.TLabel").grid(row=7, column=0, sticky="w")
+        ttk.Entry(form, textvariable=self.related_person_var).grid(row=8, column=0, sticky="ew", pady=(4, 14))
+
+        ttk.Label(form, text="Contato da pessoa relacionada", style="Panel.TLabel").grid(row=9, column=0, sticky="w")
         ttk.Entry(form, textvariable=self.related_person_contact_var).grid(
-            row=8, column=0, sticky="ew", pady=(4, 14)
+            row=10, column=0, sticky="ew", pady=(4, 14)
         )
 
-        ttk.Label(form, text="Vencimento (DD/MM/AAAA)", style="Panel.TLabel").grid(row=9, column=0, sticky="w")
+        ttk.Label(form, text="Vencimento (DD/MM/AAAA)", style="Panel.TLabel").grid(row=11, column=0, sticky="w")
         self.due_date_entry = ttk.Entry(form, textvariable=self.due_date_var)
-        self.due_date_entry.grid(row=10, column=0, sticky="ew", pady=(4, 14))
+        self.due_date_entry.grid(row=12, column=0, sticky="ew", pady=(4, 14))
         self.due_date_entry.bind("<KeyRelease>", self._apply_due_date_mask)
 
-        ttk.Label(form, text="Horas", style="Panel.TLabel").grid(row=11, column=0, sticky="w")
-        ttk.Entry(form, textvariable=self.hours_var).grid(row=12, column=0, sticky="ew", pady=(4, 14))
+        ttk.Label(form, text="Horas", style="Panel.TLabel").grid(row=13, column=0, sticky="w")
+        ttk.Entry(form, textvariable=self.hours_var).grid(row=14, column=0, sticky="ew", pady=(4, 14))
 
-        ttk.Label(form, text="Prioridade", style="Panel.TLabel").grid(row=13, column=0, sticky="w")
+        ttk.Label(form, text="Prioridade", style="Panel.TLabel").grid(row=15, column=0, sticky="w")
         ttk.Combobox(
             form,
             textvariable=self.priority_var,
             values=PRIORITIES,
             state="readonly",
-        ).grid(row=14, column=0, sticky="ew", pady=(4, 14))
+        ).grid(row=16, column=0, sticky="ew", pady=(4, 14))
 
-        ttk.Label(form, text="Observacoes", style="Panel.TLabel").grid(row=15, column=0, sticky="w")
+        ttk.Label(form, text="Observacoes", style="Panel.TLabel").grid(row=17, column=0, sticky="w")
         self.notes_text = tk.Text(
             form,
             height=4,
@@ -210,21 +241,21 @@ class TodoApp(tk.Tk):
             borderwidth=1,
             font=("Segoe UI", 10),
         )
-        self.notes_text.grid(row=16, column=0, sticky="nsew", pady=(4, 16))
+        self.notes_text.grid(row=18, column=0, sticky="nsew", pady=(4, 16))
 
         ttk.Label(form, textvariable=self.form_feedback_var, style="Success.Panel.TLabel").grid(
-            row=17, column=0, sticky="w", pady=(0, 6)
+            row=19, column=0, sticky="w", pady=(0, 6)
         )
         self.save_button = ttk.Button(form, text="Criar tarefa", style="Primary.TButton", command=self._save_task)
         self.save_button.grid(
-            row=18, column=0, sticky="ew", pady=(0, 8)
-        )
-        ttk.Button(form, text="Nova tarefa", command=self._clear_form).grid(row=19, column=0, sticky="ew", pady=(0, 8))
-        ttk.Button(form, text="Concluir / reabrir", command=self._toggle_selected).grid(
             row=20, column=0, sticky="ew", pady=(0, 8)
         )
+        ttk.Button(form, text="Nova tarefa", command=self._clear_form).grid(row=21, column=0, sticky="ew", pady=(0, 8))
+        ttk.Button(form, text="Concluir / reabrir", command=self._toggle_selected).grid(
+            row=22, column=0, sticky="ew", pady=(0, 8)
+        )
         ttk.Button(form, text="Excluir selecionada", command=self._delete_selected).grid(
-            row=21, column=0, sticky="ew"
+            row=23, column=0, sticky="ew"
         )
 
         list_panel = ttk.Frame(content_pane, style="Panel.TFrame", padding=18)
@@ -263,6 +294,7 @@ class TodoApp(tk.Tk):
         self.tree.column("#0", width=0, minwidth=0, stretch=False)
         self.tree.column("title", width=COLUMN_WIDTHS["title"], minwidth=COLUMN_MIN_WIDTHS["title"], stretch=False)
         self.tree.column("area", width=COLUMN_WIDTHS["area"], minwidth=COLUMN_MIN_WIDTHS["area"], stretch=False)
+        self.tree.column("group", width=COLUMN_WIDTHS["group"], minwidth=COLUMN_MIN_WIDTHS["group"], stretch=False)
         self.tree.column(
             "related_person",
             width=COLUMN_WIDTHS["related_person"],
@@ -442,6 +474,7 @@ class TodoApp(tk.Tk):
                     [
                         task.title,
                         task.area,
+                        task.group,
                         task.related_person,
                         task.related_person_contact,
                         task.hours,
@@ -472,6 +505,8 @@ class TodoApp(tk.Tk):
             return task.title
         if column == "area":
             return task.area
+        if column == "group":
+            return task.group
         if column == "related_person":
             return task.related_person
         if column == "priority":
@@ -504,6 +539,8 @@ class TodoApp(tk.Tk):
             return (task.title.lower(), STATE_SORT_RANK[state], self._due_date_sort_key(task.due_date))
         if self.sort_column == "area":
             return (task.area.lower(), STATE_SORT_RANK[state], self._due_date_sort_key(task.due_date))
+        if self.sort_column == "group":
+            return (task.group.lower(), STATE_SORT_RANK[state], self._due_date_sort_key(task.due_date))
         if self.sort_column == "related_person":
             return (task.related_person.lower(), STATE_SORT_RANK[state], self._due_date_sort_key(task.due_date))
         if self.sort_column == "priority":
@@ -686,6 +723,7 @@ class TodoApp(tk.Tk):
                 values=(
                     task.title,
                     task.area,
+                    task.group,
                     task.related_person,
                     task.priority,
                     task.due_date,
@@ -721,6 +759,7 @@ class TodoApp(tk.Tk):
 
         self.title_var.set(task.title)
         self.area_var.set(task.area)
+        self.group_var.set(task.group)
         self.related_person_var.set(task.related_person)
         self.related_person_contact_var.set(task.related_person_contact)
         self.due_date_var.set(task.due_date)
@@ -782,6 +821,7 @@ class TodoApp(tk.Tk):
                 task_id=existing.task_id,
                 title=self.title_var.get().strip(),
                 area=self.area_var.get().strip(),
+                group=self.group_var.get().strip(),
                 related_person=self.related_person_var.get().strip(),
                 related_person_contact=self.related_person_contact_var.get().strip(),
                 due_date=due_date,
@@ -796,6 +836,7 @@ class TodoApp(tk.Tk):
             task = Task(
                 title=self.title_var.get().strip(),
                 area=self.area_var.get().strip(),
+                group=self.group_var.get().strip(),
                 related_person=self.related_person_var.get().strip(),
                 related_person_contact=self.related_person_contact_var.get().strip(),
                 due_date=due_date,
@@ -838,6 +879,7 @@ class TodoApp(tk.Tk):
         self.selected_task_id = None
         self.title_var.set("")
         self.area_var.set("")
+        self.group_var.set("")
         self.related_person_var.set("")
         self.related_person_contact_var.set("")
         self.due_date_var.set("")

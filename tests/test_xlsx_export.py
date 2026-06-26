@@ -17,6 +17,7 @@ class XlsxExportTest(unittest.TestCase):
             task = Task(
                 title="Preparar relatorio",
                 area="Financeiro",
+                group="Fechamento",
                 related_person="Mariana",
                 related_person_contact="(31) 99999-0000",
                 due_date="30/05/2026",
@@ -37,8 +38,10 @@ class XlsxExportTest(unittest.TestCase):
         exported_text = [node.text for node in root.findall(".//sheet:t", namespace)]
 
         self.assertIn("Contato da pessoa relacionada", exported_text)
+        self.assertIn("Grupo", exported_text)
         self.assertIn("Horas", exported_text)
         self.assertIn("Observacoes", exported_text)
+        self.assertIn("Fechamento", exported_text)
         self.assertIn("(31) 99999-0000", exported_text)
         self.assertIn("2,5", exported_text)
         self.assertIn("Enviar previa por e-mail", exported_text)

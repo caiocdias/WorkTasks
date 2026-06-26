@@ -5,7 +5,7 @@ Aplicativo desktop simples para organizar tarefas de trabalho com persistencia e
 ## Recursos
 
 - Criar, editar, concluir, reabrir e excluir tarefas.
-- Prioridade, area/projeto, pessoa relacionada, contato, data de vencimento em `dd/mm/aaaa` e observacoes.
+- Prioridade, area/projeto, grupo, pessoa relacionada, contato, data de vencimento em `dd/mm/aaaa` e observacoes.
 - Quantidade de horas por tarefa, com suporte a valores decimais.
 - Busca por texto e ordenacao clicando nos cabecalhos.
 - Cabecalho de cada coluna com botao separado para ordenar e botao de funil para filtrar.

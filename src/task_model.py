@@ -118,6 +118,7 @@ class Task:
     title: str
     notes: str = ""
     area: str = ""
+    group: str = ""
     due_date: str = ""
     hours: str = ""
     priority: str = "Media"
@@ -141,6 +142,7 @@ class Task:
             "title": self.title,
             "notes": self.notes,
             "area": self.area,
+            "group": self.group,
             "related_person": self.related_person,
             "related_person_contact": self.related_person_contact,
             "due_date": self.due_date,
@@ -166,6 +168,7 @@ class Task:
             title=str(raw.get("title") or "").strip(),
             notes=str(raw.get("notes") or ""),
             area=str(raw.get("area") or ""),
+            group=str(raw.get("group") or ""),
             related_person=str(raw.get("related_person") or ""),
             related_person_contact=str(raw.get("related_person_contact") or ""),
             due_date=normalize_due_date(str(raw.get("due_date") or "")),

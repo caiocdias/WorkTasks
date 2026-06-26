@@ -11,6 +11,7 @@ from .task_model import Task, task_state
 EXPORT_HEADERS = (
     "Tarefa",
     "Area/Projeto",
+    "Grupo",
     "Pessoa relacionada",
     "Contato da pessoa relacionada",
     "Prioridade",
@@ -46,6 +47,7 @@ def _task_to_row(task: Task) -> tuple[str, ...]:
     return (
         task.title,
         task.area,
+        task.group,
         task.related_person,
         task.related_person_contact,
         task.priority,
@@ -60,7 +62,7 @@ def _worksheet_xml(rows: list[tuple[str, ...]]) -> str:
     row_xml = "\n".join(_row_xml(index, row) for index, row in enumerate(rows, start=1))
     columns_xml = "\n".join(
         f'<col min="{index}" max="{index}" width="{width}" customWidth="1"/>'
-        for index, width in enumerate((32, 22, 24, 30, 14, 14, 12, 18, 42), start=1)
+        for index, width in enumerate((32, 20, 18, 24, 30, 14, 14, 12, 18, 42), start=1)
     )
     dimension = f"A1:{_column_name(len(EXPORT_HEADERS))}{max(len(rows), 1)}"
 
