@@ -11,6 +11,7 @@ Aplicativo desktop simples para organizar tarefas de trabalho com persistencia e
 - Cabecalho de cada coluna com botao separado para ordenar e botao de funil para filtrar.
 - Filtros por coluna com texto e selecao de valores existentes.
 - Exportacao da tabela visivel para `.xlsx`, incluindo horas, observacoes e contato da pessoa relacionada.
+- Alternancia entre tema claro e tema escuro.
 - Mascara automatica no campo de vencimento para `dd/mm/aaaa`.
 - Status calculados: `Concluída`, `No prazo`, `Vence em 7 dias`, `Vence hoje` e `Em atraso`.
 - Pasta de dados configuravel pela interface.

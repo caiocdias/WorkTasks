@@ -62,6 +62,54 @@ FORM_PANE_INITIAL_WIDTH = 320
 FORM_PANE_MIN_WIDTH = 300
 LIST_PANE_MIN_WIDTH = 620
 FORM_MODE_LABEL_WRAP_LENGTH = 260
+THEME_LIGHT = "light"
+THEME_DARK = "dark"
+THEMES = {
+    THEME_LIGHT: {
+        "app_bg": "#f5f7fb",
+        "panel_bg": "#ffffff",
+        "pane_bg": "#d1d5db",
+        "text": "#1f2937",
+        "header": "#111827",
+        "muted": "#6b7280",
+        "success": "#047857",
+        "button_bg": "#f8fafc",
+        "button_hover": "#e5e7eb",
+        "button_fg": "#1f2937",
+        "primary_bg": "#2563eb",
+        "primary_hover": "#1d4ed8",
+        "primary_fg": "#ffffff",
+        "input_bg": "#ffffff",
+        "input_fg": "#111827",
+        "input_border": "#d1d5db",
+        "tree_bg": "#ffffff",
+        "tree_fg": "#111827",
+        "tree_selected_bg": "#dbeafe",
+        "tree_selected_fg": "#111827",
+    },
+    THEME_DARK: {
+        "app_bg": "#101318",
+        "panel_bg": "#171b22",
+        "pane_bg": "#2a303a",
+        "text": "#e5e7eb",
+        "header": "#f8fafc",
+        "muted": "#9ca3af",
+        "success": "#34d399",
+        "button_bg": "#242a34",
+        "button_hover": "#303846",
+        "button_fg": "#e5e7eb",
+        "primary_bg": "#3b82f6",
+        "primary_hover": "#60a5fa",
+        "primary_fg": "#f8fafc",
+        "input_bg": "#111827",
+        "input_fg": "#f3f4f6",
+        "input_border": "#374151",
+        "tree_bg": "#131820",
+        "tree_fg": "#e5e7eb",
+        "tree_selected_bg": "#1d4ed8",
+        "tree_selected_fg": "#ffffff",
+    },
+}
 
 
 class TodoApp(tk.Tk):
@@ -69,6 +117,7 @@ class TodoApp(tk.Tk):
         super().__init__()
         self.settings = settings
         self.data_folder = self.settings.load_data_folder()
+        self.theme_name = self.settings.load_theme()
         self.store: TaskStore | None = None
         self.tasks: list[Task] = []
         self.selected_task_id: str | None = None
@@ -88,7 +137,7 @@ class TodoApp(tk.Tk):
         self.title(APP_TITLE)
         self.geometry("1180x720")
         self.minsize(1080, 640)
-        self.configure(bg="#f5f7fb")
+        self.configure(bg=self._palette()["app_bg"])
 
         if self.data_folder:
             self._load_data_folder(self.data_folder, save_setting=False)
@@ -113,27 +162,145 @@ class TodoApp(tk.Tk):
         self.search_var = tk.StringVar()
         self.data_folder_var = tk.StringVar(value=self._data_folder_text())
         self.form_feedback_var = tk.StringVar()
+        self.theme_button_var = tk.StringVar()
 
         self.search_var.trace_add("write", lambda *_: self._refresh_tree())
 
+    def _palette(self) -> dict[str, str]:
+        return THEMES.get(self.theme_name, THEMES[THEME_LIGHT])
+
     def _build_style(self) -> None:
-        style = ttk.Style(self)
-        style.theme_use("clam")
-        style.configure("TFrame", background="#f5f7fb")
-        style.configure("Panel.TFrame", background="#ffffff", relief="flat")
-        style.configure("TLabel", background="#f5f7fb", foreground="#1f2937", font=("Segoe UI", 10))
-        style.configure("Panel.TLabel", background="#ffffff", foreground="#1f2937", font=("Segoe UI", 10))
-        style.configure("Success.Panel.TLabel", background="#ffffff", foreground="#047857", font=("Segoe UI Semibold", 9))
-        style.configure("Header.TLabel", background="#f5f7fb", foreground="#111827", font=("Segoe UI Semibold", 20))
-        style.configure("Muted.TLabel", background="#f5f7fb", foreground="#6b7280", font=("Segoe UI", 9))
-        style.configure("TButton", font=("Segoe UI", 10), padding=(12, 8))
+        self.style = ttk.Style(self)
+        self.style.theme_use("clam")
+        self._apply_theme_styles()
+
+    def _apply_theme_styles(self) -> None:
+        palette = self._palette()
+        style = self.style
+        style.configure("TFrame", background=palette["app_bg"])
+        style.configure("Panel.TFrame", background=palette["panel_bg"], relief="flat")
+        style.configure("TLabel", background=palette["app_bg"], foreground=palette["text"], font=("Segoe UI", 10))
+        style.configure("Panel.TLabel", background=palette["panel_bg"], foreground=palette["text"], font=("Segoe UI", 10))
+        style.configure(
+            "Success.Panel.TLabel",
+            background=palette["panel_bg"],
+            foreground=palette["success"],
+            font=("Segoe UI Semibold", 9),
+        )
+        style.configure("Header.TLabel", background=palette["app_bg"], foreground=palette["header"], font=("Segoe UI Semibold", 20))
+        style.configure("Muted.TLabel", background=palette["app_bg"], foreground=palette["muted"], font=("Segoe UI", 9))
+        style.configure(
+            "TButton",
+            background=palette["button_bg"],
+            foreground=palette["button_fg"],
+            bordercolor=palette["input_border"],
+            focuscolor=palette["button_bg"],
+            font=("Segoe UI", 10),
+            padding=(12, 8),
+        )
+        style.map(
+            "TButton",
+            background=[("active", palette["button_hover"]), ("pressed", palette["button_hover"])],
+            foreground=[("disabled", palette["muted"]), ("active", palette["button_fg"])],
+        )
         style.configure("HeaderSort.TButton", font=("Segoe UI Semibold", 9), padding=(8, 5))
         style.configure("HeaderFilter.TButton", font=("Segoe UI", 9), padding=(6, 5))
-        style.configure("Primary.TButton", background="#2563eb", foreground="#ffffff")
-        style.map("Primary.TButton", background=[("active", "#1d4ed8")])
-        style.configure("Treeview", rowheight=30, font=("Segoe UI", 10), fieldbackground="#ffffff")
+        style.configure(
+            "Primary.TButton",
+            background=palette["primary_bg"],
+            foreground=palette["primary_fg"],
+            bordercolor=palette["primary_bg"],
+            focuscolor=palette["primary_bg"],
+        )
+        style.map(
+            "Primary.TButton",
+            background=[("active", palette["primary_hover"]), ("pressed", palette["primary_hover"])],
+            foreground=[("active", palette["primary_fg"])],
+        )
+        style.configure(
+            "TEntry",
+            fieldbackground=palette["input_bg"],
+            foreground=palette["input_fg"],
+            bordercolor=palette["input_border"],
+            insertcolor=palette["input_fg"],
+        )
+        style.configure(
+            "TCombobox",
+            fieldbackground=palette["input_bg"],
+            background=palette["button_bg"],
+            foreground=palette["input_fg"],
+            bordercolor=palette["input_border"],
+            arrowcolor=palette["button_fg"],
+        )
+        style.map(
+            "TCombobox",
+            fieldbackground=[("readonly", palette["input_bg"])],
+            foreground=[("readonly", palette["input_fg"])],
+        )
+        style.configure(
+            "Treeview",
+            rowheight=30,
+            font=("Segoe UI", 10),
+            background=palette["tree_bg"],
+            fieldbackground=palette["tree_bg"],
+            foreground=palette["tree_fg"],
+            bordercolor=palette["input_border"],
+        )
+        style.map(
+            "Treeview",
+            background=[("selected", palette["tree_selected_bg"])],
+            foreground=[("selected", palette["tree_selected_fg"])],
+        )
+        style.configure(
+            "Vertical.TScrollbar",
+            background=palette["button_bg"],
+            troughcolor=palette["panel_bg"],
+            bordercolor=palette["input_border"],
+            arrowcolor=palette["button_fg"],
+        )
+        style.map(
+            "Vertical.TScrollbar",
+            background=[("active", palette["button_hover"]), ("pressed", palette["button_hover"])],
+        )
+
+    def _apply_theme(self) -> None:
+        palette = self._palette()
+        self.configure(bg=palette["app_bg"])
+        self.option_add("*TCombobox*Listbox.background", palette["input_bg"])
+        self.option_add("*TCombobox*Listbox.foreground", palette["input_fg"])
+        self.option_add("*TCombobox*Listbox.selectBackground", palette["tree_selected_bg"])
+        self.option_add("*TCombobox*Listbox.selectForeground", palette["tree_selected_fg"])
+        self._apply_theme_styles()
+        self._update_theme_button()
+
+        if hasattr(self, "content_pane"):
+            self.content_pane.configure(background=palette["pane_bg"])
+        if hasattr(self, "form_canvas"):
+            self.form_canvas.configure(background=palette["panel_bg"])
+        if hasattr(self, "notes_text"):
+            self.notes_text.configure(
+                background=palette["input_bg"],
+                foreground=palette["input_fg"],
+                insertbackground=palette["input_fg"],
+                highlightbackground=palette["input_border"],
+                highlightcolor=palette["primary_bg"],
+                selectbackground=palette["tree_selected_bg"],
+                selectforeground=palette["tree_selected_fg"],
+            )
+
+    def _update_theme_button(self) -> None:
+        if not hasattr(self, "theme_button_var"):
+            return
+        next_theme = "claro" if self.theme_name == THEME_DARK else "escuro"
+        self.theme_button_var.set(f"Tema {next_theme}")
+
+    def _toggle_theme(self) -> None:
+        self.theme_name = THEME_LIGHT if self.theme_name == THEME_DARK else THEME_DARK
+        self.settings.save_theme(self.theme_name)
+        self._apply_theme()
 
     def _build_layout(self) -> None:
+        palette = self._palette()
         shell = ttk.Frame(self, padding=24)
         shell.pack(fill=tk.BOTH, expand=True)
         shell.columnconfigure(0, weight=0)
@@ -141,34 +308,41 @@ class TodoApp(tk.Tk):
         shell.rowconfigure(1, weight=1)
 
         ttk.Label(shell, text="Tarefas do trabalho", style="Header.TLabel").grid(
-            row=0, column=0, columnspan=2, sticky="w"
+            row=0, column=0, sticky="w"
         )
+        top_actions = ttk.Frame(shell)
+        top_actions.grid(row=0, column=1, sticky="e", padx=(16, 0))
         ttk.Label(
-            shell,
+            top_actions,
             text="Organize prioridades, prazos e anotacoes em um arquivo local.",
             style="Muted.TLabel",
+        ).grid(row=0, column=0, sticky="e", padx=(0, 10))
+        ttk.Button(
+            top_actions,
+            textvariable=self.theme_button_var,
+            command=self._toggle_theme,
         ).grid(row=0, column=1, sticky="e", padx=(16, 0))
 
-        content_pane = tk.PanedWindow(
+        self.content_pane = tk.PanedWindow(
             shell,
             orient=tk.HORIZONTAL,
-            background="#d1d5db",
+            background=palette["pane_bg"],
             borderwidth=0,
             opaqueresize=True,
             sashcursor="sb_h_double_arrow",
             sashrelief=tk.FLAT,
             sashwidth=8,
         )
-        content_pane.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(20, 0))
+        self.content_pane.grid(row=1, column=0, columnspan=2, sticky="nsew", pady=(20, 0))
 
-        form_shell = ttk.Frame(content_pane, style="Panel.TFrame", width=FORM_PANE_INITIAL_WIDTH)
+        form_shell = ttk.Frame(self.content_pane, style="Panel.TFrame", width=FORM_PANE_INITIAL_WIDTH)
         form_shell.columnconfigure(0, weight=1)
         form_shell.rowconfigure(0, weight=1)
-        content_pane.add(form_shell, minsize=FORM_PANE_MIN_WIDTH, width=FORM_PANE_INITIAL_WIDTH)
+        self.content_pane.add(form_shell, minsize=FORM_PANE_MIN_WIDTH, width=FORM_PANE_INITIAL_WIDTH)
 
         self.form_canvas = tk.Canvas(
             form_shell,
-            background="#ffffff",
+            background=palette["panel_bg"],
             borderwidth=0,
             highlightthickness=0,
         )
@@ -240,6 +414,13 @@ class TodoApp(tk.Tk):
             relief=tk.SOLID,
             borderwidth=1,
             font=("Segoe UI", 10),
+            background=palette["input_bg"],
+            foreground=palette["input_fg"],
+            insertbackground=palette["input_fg"],
+            highlightbackground=palette["input_border"],
+            highlightcolor=palette["primary_bg"],
+            selectbackground=palette["tree_selected_bg"],
+            selectforeground=palette["tree_selected_fg"],
         )
         self.notes_text.grid(row=18, column=0, sticky="nsew", pady=(4, 16))
 
@@ -258,10 +439,10 @@ class TodoApp(tk.Tk):
             row=23, column=0, sticky="ew"
         )
 
-        list_panel = ttk.Frame(content_pane, style="Panel.TFrame", padding=18)
+        list_panel = ttk.Frame(self.content_pane, style="Panel.TFrame", padding=18)
         list_panel.columnconfigure(0, weight=1)
         list_panel.rowconfigure(4, weight=1)
-        content_pane.add(list_panel, minsize=LIST_PANE_MIN_WIDTH)
+        self.content_pane.add(list_panel, minsize=LIST_PANE_MIN_WIDTH)
 
         data_controls = ttk.Frame(list_panel, style="Panel.TFrame")
         data_controls.grid(row=0, column=0, sticky="ew")
@@ -339,6 +520,7 @@ class TodoApp(tk.Tk):
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.after_idle(self._sync_table_widths)
         self._update_headings()
+        self._apply_theme()
 
     def _data_folder_text(self) -> str:
         if not self.data_folder:
@@ -578,6 +760,7 @@ class TodoApp(tk.Tk):
             self.filter_buttons[column].configure(text=funnel)
 
     def _open_column_filter(self, column: str) -> None:
+        palette = self._palette()
         values = self._column_filter_values(column)
         column_filter = self.column_filters[column]
 
@@ -586,7 +769,7 @@ class TodoApp(tk.Tk):
         window.geometry("340x430")
         window.transient(self)
         window.grab_set()
-        window.configure(bg="#ffffff")
+        window.configure(bg=palette["panel_bg"])
 
         frame = ttk.Frame(window, style="Panel.TFrame", padding=16)
         frame.pack(fill=tk.BOTH, expand=True)
@@ -611,6 +794,12 @@ class TodoApp(tk.Tk):
             relief=tk.SOLID,
             borderwidth=1,
             font=("Segoe UI", 10),
+            background=palette["input_bg"],
+            foreground=palette["input_fg"],
+            selectbackground=palette["tree_selected_bg"],
+            selectforeground=palette["tree_selected_fg"],
+            highlightbackground=palette["input_border"],
+            highlightcolor=palette["primary_bg"],
         )
         listbox.grid(row=0, column=0, sticky="nsew")
         value_scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=listbox.yview)
