@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ctypes
+import sys
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
@@ -86,6 +88,9 @@ THEMES = {
         "tree_fg": "#111827",
         "tree_selected_bg": "#dbeafe",
         "tree_selected_fg": "#111827",
+        "title_bar_bg": "#f5f7fb",
+        "title_bar_fg": "#111827",
+        "title_bar_border": "#d1d5db",
     },
     THEME_DARK: {
         "app_bg": "#101318",
@@ -108,8 +113,19 @@ THEMES = {
         "tree_fg": "#e5e7eb",
         "tree_selected_bg": "#1d4ed8",
         "tree_selected_fg": "#ffffff",
+        "title_bar_bg": "#101318",
+        "title_bar_fg": "#f8fafc",
+        "title_bar_border": "#2a303a",
     },
 }
+
+
+def _windows_colorref(hex_color: str) -> int:
+    color = hex_color.removeprefix("#")
+    red = int(color[0:2], 16)
+    green = int(color[2:4], 16)
+    blue = int(color[4:6], 16)
+    return red | (green << 8) | (blue << 16)
 
 
 class TodoApp(tk.Tk):
@@ -133,11 +149,13 @@ class TodoApp(tk.Tk):
         self.syncing_table_widths = False
         self.is_formatting_due_date = False
         self.form_feedback_clear_after_id: str | None = None
+        self.title_bar_theme_after_ids: list[str] = []
 
         self.title(APP_TITLE)
         self.geometry("1180x720")
         self.minsize(1080, 640)
         self.configure(bg=self._palette()["app_bg"])
+        self.bind("<Map>", self._on_window_mapped)
 
         if self.data_folder:
             self._load_data_folder(self.data_folder, save_setting=False)
@@ -287,6 +305,85 @@ class TodoApp(tk.Tk):
                 selectbackground=palette["tree_selected_bg"],
                 selectforeground=palette["tree_selected_fg"],
             )
+        self._schedule_windows_title_bar_theme()
+
+    def _schedule_windows_title_bar_theme(self) -> None:
+        for after_id in self.title_bar_theme_after_ids:
+            try:
+                self.after_cancel(after_id)
+            except tk.TclError:
+                pass
+        self.title_bar_theme_after_ids = []
+
+        self.after_idle(self._apply_windows_title_bar_theme)
+        self.title_bar_theme_after_ids = [
+            self.after(150, self._apply_windows_title_bar_theme),
+            self.after(600, self._apply_windows_title_bar_theme),
+        ]
+
+    def _on_window_mapped(self, _event: tk.Event) -> None:
+        self._schedule_windows_title_bar_theme()
+
+    def _apply_windows_title_bar_theme(self) -> None:
+        if not sys.platform.startswith("win"):
+            return
+
+        try:
+            root_handle = ctypes.c_void_p(self.winfo_id())
+            dark_mode = ctypes.c_int(1 if self.theme_name == THEME_DARK else 0)
+            palette = self._palette()
+            color_attributes = {
+                34: palette["title_bar_border"],
+                35: palette["title_bar_bg"],
+                36: palette["title_bar_fg"],
+            }
+            dwmapi = ctypes.windll.dwmapi
+            user32 = ctypes.windll.user32
+            user32.GetParent.argtypes = [ctypes.c_void_p]
+            user32.GetParent.restype = ctypes.c_void_p
+            user32.SetWindowPos.argtypes = [
+                ctypes.c_void_p,
+                ctypes.c_void_p,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_uint,
+            ]
+            handles = [root_handle]
+            parent_handle = user32.GetParent(root_handle)
+            if parent_handle:
+                handles.insert(0, ctypes.c_void_p(parent_handle))
+
+            for handle in handles:
+                for attribute in (20, 19):
+                    dwmapi.DwmSetWindowAttribute(
+                        handle,
+                        attribute,
+                        ctypes.byref(dark_mode),
+                        ctypes.sizeof(dark_mode),
+                    )
+
+                for attribute, color in color_attributes.items():
+                    color_value = ctypes.c_uint(_windows_colorref(color))
+                    dwmapi.DwmSetWindowAttribute(
+                        handle,
+                        attribute,
+                        ctypes.byref(color_value),
+                        ctypes.sizeof(color_value),
+                    )
+
+                user32.SetWindowPos(
+                    handle,
+                    ctypes.c_void_p(),
+                    0,
+                    0,
+                    0,
+                    0,
+                    0x0001 | 0x0002 | 0x0004 | 0x0020,
+                )
+        except (AttributeError, OSError, tk.TclError, ValueError):
+            return
 
     def _update_theme_button(self) -> None:
         if not hasattr(self, "theme_button_var"):
